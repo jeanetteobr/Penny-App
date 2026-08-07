@@ -2,51 +2,49 @@
 
 > Know where your money goes.
 
-Penny is a lightweight personal budget tracker built to make everyday finances feel clear rather than intimidating.
+Penny is a lightweight personal budget tracker for recording income and expenses, understanding overall financial position, filtering transaction history, and surfacing useful spending patterns.
 
-Users can track income and expenses, understand their current financial position, search and filter transaction history, and surface useful patterns in their spending.
-
-Penny's core product idea is simple:
-
-**Turn transactions into understanding.**
+**Penny turns transactions into understanding.**
 
 ## Project Status
 
-Penny is currently under active development as a full-stack take-home project.
+Penny is a functionally complete full-stack take-home application.
 
-The frontend experience and core interactions have been prototyped and implemented. The repository has been structured as a pnpm monorepo with a React client and Node.js server.
+The current implementation includes:
 
-The backend currently exposes a health endpoint. Transaction persistence, summary calculations, and spending-insight APIs are the next implementation steps.
+- Persisted transaction CRUD with JSON-file storage
+- Server-side search and filtering
+- Budget summary (income, expenses, balance)
+- Month-scoped spending insights
+- React frontend connected to live Express APIs
+- Loading and error states with per-resource retry
+- Zod validation on the server
+- Automated Vitest coverage for summary and insights logic
 
 ## Features
 
 ### Budget tracking
 
-- View income and expenses
-- See current balance at a glance
-- Add transactions
-- Edit transactions
-- Delete transactions
-- Search transactions by description
-- Filter transactions by type
-- Filter transactions by category
+- Add income and expense transactions
+- Edit existing transactions
+- Delete transactions with confirmation
+- View current balance, total income, and total expenses
+- Search transaction descriptions
+- Filter by transaction type and category
+- JSON-backed persistence across local server restarts
 
 ### Spending insights
 
-Penny's primary enhancement is **A little perspective**, a lightweight spending-insights experience designed to help users understand the story behind their transaction data.
+Penny’s product enhancement is **A little perspective** — a lightweight view of spending for a selected month.
 
-Rather than presenting a dense analytics dashboard, Penny surfaces useful context such as:
+From expense data, Penny surfaces:
 
-- the largest non-housing spending category for the current month
-- the amount and percentage represented by each category
-- the user's largest individual expense
-- a direct path from an insight to the transactions that contributed to it
+- The biggest non-housing spending category
+- Category totals and percentages
+- The largest individual expense
+- A direct path from an insight to the matching transactions in Recent Activity
 
-The goal is to move naturally from:
-
-**Data → Insight → Action**
-
-without judging the user's spending behavior.
+Housing is excluded from the category-comparison calculation so day-to-day categories stay comparable, but Housing remains eligible as the largest individual expense.
 
 ## Tech Stack
 
@@ -57,17 +55,51 @@ without judging the user's spending behavior.
 - Vite
 - Tailwind CSS
 - Lucide icons
+- Browser Fetch API (thin client API layer; no React Query)
 
 ### Server
 
 - Node.js
 - TypeScript
 - Express
+- Zod
+- JSON file persistence
 
-### Tooling
+### Testing / tooling
 
+- Vitest
 - pnpm workspaces
-- mise for local Node.js and pnpm version management
+- mise for pinned local Node.js and pnpm versions
+
+## Architecture
+
+```text
+Client (React)
+  ↓
+client/src/lib/api.ts
+  ↓
+Express API routes
+  ↓
+services (transactions, summary, insights)
+  ↓
+server/src/data/transactions.json
+```
+
+The backend is the source of truth for:
+
+- Persisted transactions
+- Summary calculations
+- Spending-insight calculations
+
+The frontend owns:
+
+- Presentation and layout
+- Filter/search UI state
+- Forms, panels, and confirmation dialogs
+- Loading and error presentation
+- Mapping semantic API data to user-facing copy
+
+Recent Activity filters affect only the transaction list. Summary and insights always reflect the full persisted dataset (insights scoped by month).
 
 ## Repository Structure
 
@@ -75,33 +107,31 @@ without judging the user's spending behavior.
 Penny-App/
 ├── client/
 │   ├── src/
-│   ├── index.html
 │   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-│
+│   └── vite.config.ts
 ├── server/
 │   ├── src/
-│   │   └── index.ts
-│   ├── package.json
-│   └── tsconfig.json
-│
+│   │   ├── data/
+│   │   ├── routes/
+│   │   ├── schemas/
+│   │   ├── services/
+│   │   └── types/
+│   └── package.json
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── pnpm-lock.yaml
-└── .mise.toml
+├── .mise.toml
+└── README.md
 ```
 
 ## Prerequisites
-
-Penny currently uses:
 
 - Node.js 22
 - pnpm 10.34.3
 
 These versions are pinned in `.mise.toml`.
 
-If you use [mise](https://mise.jdx.dev/), you can install the configured toolchain with:
+If you use [mise](https://mise.jdx.dev/):
 
 ```bash
 mise install
@@ -111,132 +141,206 @@ Otherwise, install compatible versions of Node.js and pnpm manually.
 
 ## Setup
 
-Clone the repository:
-
 ```bash
 git clone https://github.com/jeanetteobr/Penny-App.git
 cd Penny-App
-```
-
-Install dependencies from the repository root:
-
-```bash
 pnpm install
 ```
 
 ## Run the App
 
-Start both the React client and Express server:
+Start the client and server together:
 
 ```bash
 pnpm dev
 ```
 
-The applications will be available at:
-
 - Frontend: http://localhost:5173
 - API: http://localhost:3001
 
-### Run individually
+During local development, the Vite client proxies `/api` requests to the Express server on port 3001.
 
-Frontend only:
+### Run individually
 
 ```bash
 pnpm dev:client
-```
-
-Server only:
-
-```bash
 pnpm dev:server
 ```
 
+## Development Commands
+
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Run client and server in parallel |
+| `pnpm build` | Build client and server |
+| `pnpm --filter @penny/client build` | Build the client only |
+| `pnpm --filter @penny/server build` | Build the server only |
+| `pnpm --filter @penny/server test` | Run server unit tests |
+
 ## Verify the API
 
-The server currently exposes a health endpoint:
+With the server running (`pnpm dev` or `pnpm dev:server`):
 
-```http
-GET /api/health
-```
-
-Expected response:
-
-```json
-{
-  "status": "ok"
-}
-```
-
-You can verify it locally with:
+| Request | Purpose |
+| --- | --- |
+| `GET /api/health` | Health check |
+| `GET /api/transactions` | List transactions |
+| `GET /api/summary` | Budget totals |
+| `GET /api/insights?month=2026-08` | August 2026 insights (demo month) |
 
 ```bash
 curl http://localhost:3001/api/health
+curl http://localhost:3001/api/summary
+curl "http://localhost:3001/api/insights?month=2026-08"
 ```
 
-## Build
+## API
 
-Build the full workspace:
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/health` | Health check (`{ "status": "ok" }`) |
+| `GET` | `/api/transactions` | List transactions (optional filters) |
+| `POST` | `/api/transactions` | Create a transaction |
+| `PUT` | `/api/transactions/:id` | Update a transaction |
+| `DELETE` | `/api/transactions/:id` | Delete a transaction (`204` on success) |
+| `GET` | `/api/summary` | Income, expenses, and balance |
+| `GET` | `/api/insights` | Month-scoped spending insights |
+
+### Transaction filters
+
+`GET /api/transactions` accepts optional query parameters:
+
+| Parameter | Description |
+| --- | --- |
+| `type` | `income` or `expense` |
+| `category` | A valid transaction category |
+| `search` | Case-insensitive substring match on description |
+
+Combined filters use **AND** semantics.
+
+### Insights month
+
+`GET /api/insights` accepts:
+
+| Parameter | Description |
+| --- | --- |
+| `month` | `YYYY-MM` (optional) |
+
+If `month` is omitted, the server defaults to the current calendar month. The Penny dashboard explicitly requests `2026-08` because the demo dataset and UI represent August 2026.
+
+## Transaction Model
+
+```ts
+{
+  id: string
+  date: string          // YYYY-MM-DD
+  description: string
+  amount: number        // positive number
+  type: "income" | "expense"
+  category: Category
+}
+```
+
+- Amounts are stored as positive numbers; `type` determines income vs expense
+- IDs are generated server-side (`POST` does not accept a client `id`)
+- Category must be valid for the selected type (expense vs income categories)
+
+Expense categories: Food, Housing, Utilities, Shopping, Entertainment, Transportation  
+Income categories: Salary, Freelance
+
+## Summary
+
+`GET /api/summary` returns:
+
+```json
+{
+  "income": 3810,
+  "expenses": 2135.02,
+  "balance": 1674.98
+}
+```
+
+Where `balance = income - expenses`.
+
+Summary always uses the full persisted dataset. Recent Activity search/type/category filters do not affect these totals.
+
+## Insights
+
+`GET /api/insights?month=YYYY-MM` returns semantic spending data, including:
+
+- `status`
+- `totalNonHousingSpending`
+- `topCategory`
+- `categories` (breakdown with amounts and percentages)
+- `largestExpense`
+
+Possible `status` values:
+
+| Status | Meaning |
+| --- | --- |
+| `ready` | Enough non-housing expense data to show insights |
+| `no-expenses` | No expenses in the month |
+| `no-non-housing-expenses` | Expenses exist, but all are Housing |
+| `insufficient-data` | Not enough expense transactions for a meaningful breakdown |
+
+The frontend maps this response into the **A little perspective** presentation and copy.
+
+## Persistence
+
+Transactions are stored in `server/src/data/transactions.json`.
+
+For the take-home scope, Penny uses lightweight JSON-file persistence instead of a database. Writes use a temporary file plus rename so updates are atomic for local development. This is intentionally simple and is not production-ready storage.
+
+## Validation
+
+Create and update requests are validated on the server with Zod, including:
+
+- Amounts greater than zero
+- Valid `YYYY-MM-DD` calendar dates
+- Non-empty descriptions
+- Valid `type` and `category` values
+- Category compatibility with the selected type
+
+## Testing
 
 ```bash
-pnpm build
+pnpm --filter @penny/server test
 ```
 
-Build an individual package:
+Server unit tests cover derived financial logic, including:
 
-```bash
-pnpm --filter @penny/client build
-pnpm --filter @penny/server build
-```
+- Summary calculations and currency rounding
+- Month-scoped spending insights
+- Housing exclusion from category comparison
+- Insight sufficiency / empty states
+- Deterministic tie-breaking
+
+The client does not currently have an automated test suite.
+
+## Product & Design
+
+- **Numbers first** — make financial position immediately understandable
+- **Color has meaning** — intentional visual treatment without relying on color alone
+- **Warm, never noisy** — approachable without visual clutter
+- **Progressive complexity** — keep the default experience simple
+- **Never shame the user** — describe spending without judging it
+- **Turn data into understanding** — interpret patterns, not just list numbers
+
+Accessibility is part of the product: semantic markup, visible labels, keyboard use, focus management, contrast, and reduced-motion support.
+
+## Take-home Scope
+
+- No authentication (single-user local app)
+- Local-only; no production deployment required
+- Lightweight JSON persistence (no external database)
+- Architecture favors clarity and maintainability over production infrastructure
 
 ## Environment Variables
 
-Penny does not currently require any environment variables.
+Penny does not require environment variables for normal local use.
 
-The server defaults to port `3001` and respects a `PORT` environment variable when provided:
+The server defaults to port `3001` and respects `PORT` when set:
 
 ```bash
 PORT=4000 pnpm dev:server
 ```
-
-If additional environment variables are introduced during development, they will be documented here and added to `.env.example`.
-
-## API
-
-The backend is currently being implemented.
-
-The completed application will support:
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/transactions` | List transactions with optional type, category, and text filters |
-| `POST` | `/api/transactions` | Create a transaction |
-| `PUT` | `/api/transactions/:id` | Update a transaction |
-| `DELETE` | `/api/transactions/:id` | Delete a transaction |
-| `GET` | `/api/summary` | Return total income, total expenses, and current balance |
-| `GET` | `/api/insights` | Return Penny's current-month spending insights |
-
-Currently implemented:
-
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| `GET` | `/api/health` | Verify that the API server is running |
-
-## Product & Design
-
-Penny is designed around a few principles:
-
-- **Numbers first** — make the user's financial position immediately understandable.
-- **Color has meaning** — use visual treatment intentionally without relying on color alone.
-- **Warm, never noisy** — approachable without becoming visually cluttered.
-- **Progressive complexity** — keep the default experience simple and reveal controls when needed.
-- **Never shame the user** — describe financial behavior without judging it.
-- **Turn data into understanding** — interpret patterns rather than simply visualizing numbers.
-
-Accessibility is considered part of the product rather than a finishing pass, including semantic markup, visible labels, keyboard interactions, focus management, sufficient contrast, and reduced-motion support.
-
-## Notes
-
-- Authentication is intentionally out of scope; Penny is a single-user application.
-- The project is designed to run locally and does not require deployment.
-- The backend will use lightweight persistence appropriate to the scope of the exercise.
-- The application favors clear, maintainable implementation over unnecessary abstraction.
