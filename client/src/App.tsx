@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Header from './components/Header'
 import BalanceSection from './components/BalanceSection'
 import SpendingInsights from './components/SpendingInsights'
@@ -6,7 +6,8 @@ import RecentActivity from './components/RecentActivity'
 import TransactionPanel from './components/TransactionPanel'
 import DeleteModal from './components/DeleteModal'
 import { useTransactions } from './hooks/useTransactions'
-import { useInsights, INSIGHTS_MONTH } from './hooks/useInsights'
+import { useInsights, DEFAULT_MONTH } from './hooks/useInsights'
+import { useTransactionMonths } from './hooks/useTransactionMonths'
 import { useSummary } from './hooks/useSummary'
 import type { Transaction, Category, TransactionType } from './types/transaction'
 
@@ -16,6 +17,7 @@ type PanelState =
   | { mode: 'edit'; transaction: Transaction }
 
 export default function App() {
+  const [selectedMonth, setSelectedMonth] = useState(DEFAULT_MONTH)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all')
@@ -28,11 +30,26 @@ export default function App() {
   } = useSummary()
 
   const {
+    months,
+    loading: monthsLoading,
+    refresh: refreshMonths,
+  } = useTransactionMonths()
+
+  // If the selected month disappears (e.g. last txn deleted), fall back to newest.
+  useEffect(() => {
+    if (monthsLoading) return
+    if (months.length === 0) return
+    if (!months.includes(selectedMonth)) {
+      setSelectedMonth(months[0])
+    }
+  }, [months, monthsLoading, selectedMonth])
+
+  const {
     insights,
     loading: insightsLoading,
     error: insightsError,
     refresh: refreshInsights,
-  } = useInsights(INSIGHTS_MONTH)
+  } = useInsights(selectedMonth)
 
   const {
     transactions,
@@ -43,6 +60,7 @@ export default function App() {
     updateTransaction,
     deleteTransaction,
   } = useTransactions({
+    month: selectedMonth,
     search,
     type: typeFilter,
     category: categoryFilter,
@@ -58,6 +76,7 @@ export default function App() {
       refreshTransactions(),
       refreshSummary(),
       refreshInsights(),
+      refreshMonths(),
     ])
   }
 
@@ -120,7 +139,12 @@ export default function App() {
         style={{ maxWidth: '1240px', margin: '0 auto', padding: '0 20px 80px' }}
         className="penny-container"
       >
-        <Header />
+        <Header
+          selectedMonth={selectedMonth}
+          months={months}
+          loading={monthsLoading}
+          onMonthChange={setSelectedMonth}
+        />
 
         <div
           style={{

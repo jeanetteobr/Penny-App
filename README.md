@@ -31,6 +31,7 @@ The current implementation includes:
 - View current balance, total income, and total expenses
 - Search transaction descriptions
 - Filter by transaction type and category
+- Explore a selected month in Recent Activity and insights
 - SQLite-backed persistence across local server restarts
 
 ### Spending insights
@@ -99,7 +100,7 @@ The frontend owns:
 - Loading and error presentation
 - Mapping semantic API data to user-facing copy
 
-Recent Activity filters affect only the transaction list. Summary and insights always reflect the full persisted dataset (insights scoped by month).
+Recent Activity search, type, and category filters affect only the transaction list. Summary always reflects the full persisted dataset. Insights and Recent Activity share the dashboard’s selected month.
 
 ## Repository Structure
 
@@ -201,6 +202,7 @@ curl "http://localhost:3001/api/insights?month=2026-08"
 | --- | --- | --- |
 | `GET` | `/api/health` | Health check (`{ "status": "ok" }`) |
 | `GET` | `/api/transactions` | List transactions (optional filters) |
+| `GET` | `/api/transactions/months` | Distinct `YYYY-MM` values from persisted transactions (`{ "months": [...] }`, newest first) |
 | `POST` | `/api/transactions` | Create a transaction |
 | `PUT` | `/api/transactions/:id` | Update a transaction |
 | `DELETE` | `/api/transactions/:id` | Delete a transaction (`204` on success) |
@@ -213,6 +215,7 @@ curl "http://localhost:3001/api/insights?month=2026-08"
 
 | Parameter | Description |
 | --- | --- |
+| `month` | `YYYY-MM` — transactions whose date falls in that month |
 | `type` | `income` or `expense` |
 | `category` | A valid transaction category |
 | `search` | Case-insensitive substring match on description |
@@ -227,7 +230,7 @@ Combined filters use **AND** semantics.
 | --- | --- |
 | `month` | `YYYY-MM` (optional) |
 
-If `month` is omitted, the server defaults to the current calendar month. The Penny dashboard explicitly requests `2026-08` because the demo dataset and UI represent August 2026.
+If `month` is omitted, the server defaults to the current calendar month. The Penny dashboard initially opens on August 2026 (`2026-08`), with a month dropdown for exploring transaction history and spending insights. Changing the month does not affect overall summary totals.
 
 ## Transaction Model
 

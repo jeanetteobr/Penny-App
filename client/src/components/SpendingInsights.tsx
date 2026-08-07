@@ -1,7 +1,7 @@
 import React from 'react'
 import { Home, Utensils, ShoppingBag, Zap, Car, Tv, Briefcase, Laptop } from 'lucide-react'
 import CategoryBar from './CategoryBar'
-import { formatCurrency, formatDateShort } from '../utils/format'
+import { formatCurrency, formatDateShort, formatMonthLabel } from '../utils/format'
 import type { InsightsData } from '../hooks/useInsights'
 import type { Category } from '../types/transaction'
 
@@ -39,6 +39,7 @@ export default function SpendingInsights({
     topCategoryPercentage,
     categoryBreakdown,
     largestExpense,
+    month,
   } = insights
 
   function emptyMessage() {
@@ -92,7 +93,7 @@ export default function SpendingInsights({
             margin: 0,
           }}
         >
-          August 2026 · Non-housing spending
+          {formatMonthLabel(month)} · Non-housing spending
         </p>
       </div>
 

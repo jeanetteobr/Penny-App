@@ -8,8 +8,8 @@ import {
 } from "../lib/api";
 import type { Category } from "../types/transaction";
 
-/** Dashboard period represented by the current Penny UI. */
-export const INSIGHTS_MONTH = "2026-08";
+/** Default exploration month for the demo dataset. */
+export const DEFAULT_MONTH = "2026-08";
 
 export interface CategoryBreakdown {
   category: Category;
@@ -36,18 +36,20 @@ export interface InsightsData {
   month: string;
 }
 
-const EMPTY: InsightsData = {
-  status: null,
-  hasEnoughData: false,
-  emptyReason: null,
-  topCategory: null,
-  topCategoryAmount: 0,
-  topCategoryPercentage: 0,
-  categoryBreakdown: [],
-  largestExpense: null,
-  nonHousingTotal: 0,
-  month: INSIGHTS_MONTH,
-};
+function emptyInsights(month: string): InsightsData {
+  return {
+    status: null,
+    hasEnoughData: false,
+    emptyReason: null,
+    topCategory: null,
+    topCategoryAmount: 0,
+    topCategoryPercentage: 0,
+    categoryBreakdown: [],
+    largestExpense: null,
+    nonHousingTotal: 0,
+    month,
+  };
+}
 
 function mapStatusToEmptyReason(
   status: SpendingInsightStatus,
@@ -77,8 +79,10 @@ function mapInsights(
   };
 }
 
-export function useInsights(month: string = INSIGHTS_MONTH) {
-  const [insights, setInsights] = useState<InsightsData>(EMPTY);
+export function useInsights(month: string = DEFAULT_MONTH) {
+  const [insights, setInsights] = useState<InsightsData>(() =>
+    emptyInsights(month),
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +94,7 @@ export function useInsights(month: string = INSIGHTS_MONTH) {
       setInsights(mapInsights(response));
     } catch (err) {
       setError(getErrorMessage(err, "Spending insights couldn't be loaded."));
-      setInsights(EMPTY);
+      setInsights(emptyInsights(month));
     } finally {
       setLoading(false);
     }

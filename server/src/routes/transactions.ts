@@ -7,6 +7,7 @@ import {
 import {
   createTransaction,
   deleteTransaction,
+  getAvailableMonths,
   getTransactions,
   updateTransaction,
 } from "../services/transactions.js";
@@ -23,6 +24,16 @@ function validationError(error: ZodError) {
   };
 }
 
+router.get("/months", async (_req, res) => {
+  try {
+    const months = await getAvailableMonths();
+    res.status(200).json({ months });
+  } catch (error) {
+    console.error("Failed to list transaction months:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const query = transactionListQuerySchema.parse({
@@ -30,6 +41,7 @@ router.get("/", async (req, res) => {
       category:
         typeof req.query.category === "string" ? req.query.category : undefined,
       search: typeof req.query.search === "string" ? req.query.search : undefined,
+      month: typeof req.query.month === "string" ? req.query.month : undefined,
     });
 
     const search = query.search?.trim() ? query.search : undefined;
@@ -37,6 +49,7 @@ router.get("/", async (req, res) => {
       type: query.type,
       category: query.category,
       search,
+      month: query.month,
     });
 
     res.status(200).json(transactions);
@@ -50,7 +63,6 @@ router.get("/", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 router.post("/", async (req, res) => {
   try {
     const input = transactionInputSchema.parse(req.body);

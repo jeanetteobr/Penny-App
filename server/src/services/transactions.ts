@@ -6,6 +6,7 @@ export interface TransactionFilters {
   type?: Transaction["type"];
   category?: Transaction["category"];
   search?: string;
+  month?: string;
 }
 
 interface TransactionRow {
@@ -28,6 +29,19 @@ function mapRow(row: TransactionRow): Transaction {
   };
 }
 
+export async function getAvailableMonths(): Promise<string[]> {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT substr(date, 1, 7) AS month
+       FROM transactions
+       ORDER BY month DESC`,
+    )
+    .all() as Array<{ month: string }>;
+
+  return rows.map((row) => row.month);
+}
+
 export async function getTransactions(
   filters: TransactionFilters = {},
 ): Promise<Transaction[]> {
@@ -35,6 +49,10 @@ export async function getTransactions(
   const clauses: string[] = [];
   const params: unknown[] = [];
 
+  if (filters.month) {
+    clauses.push("substr(date, 1, 7) = ?");
+    params.push(filters.month);
+  }
   if (filters.type) {
     clauses.push("type = ?");
     params.push(filters.type);

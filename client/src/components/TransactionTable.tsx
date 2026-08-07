@@ -81,10 +81,10 @@ export default function TransactionTable({
     return (
       <div style={{ padding: '56px 0', textAlign: 'center' }}>
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
-          No transactions yet.
+          No transactions for this month.
         </p>
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px', color: 'var(--graphite)', margin: '0 0 20px' }}>
-          Add your first transaction to start seeing where your money goes.
+          Add a transaction in this period, or choose another month.
         </p>
         <button
           type="button"

@@ -36,6 +36,7 @@ export function useTransactions(filters: TransactionFilters) {
 
     try {
       const next = await getTransactions({
+        month: filters.month,
         type: filters.type,
         category: filters.category,
         search: debouncedSearch,
@@ -51,7 +52,7 @@ export function useTransactions(filters: TransactionFilters) {
         setLoading(false);
       }
     }
-  }, [debouncedSearch, filters.category, filters.type]);
+  }, [debouncedSearch, filters.category, filters.month, filters.type]);
 
   useEffect(() => {
     const requestId = ++requestIdRef.current;
@@ -64,6 +65,7 @@ export function useTransactions(filters: TransactionFilters) {
       try {
         const next = await getTransactions(
           {
+            month: filters.month,
             type: filters.type,
             category: filters.category,
             search: debouncedSearch,
@@ -87,7 +89,7 @@ export function useTransactions(filters: TransactionFilters) {
     return () => {
       controller.abort();
     };
-  }, [debouncedSearch, filters.category, filters.type]);
+  }, [debouncedSearch, filters.category, filters.month, filters.type]);
 
   async function addTransaction(data: TransactionInput): Promise<void> {
     await createTransaction(data);

@@ -4,6 +4,7 @@ import {
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
 } from "../types/transaction.js";
+import { monthQuerySchema } from "./month.js";
 
 const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -65,4 +66,5 @@ export const transactionListQuerySchema = z.object({
   type: transactionTypeSchema.optional(),
   category: transactionCategorySchema.optional(),
   search: z.string().optional(),
+  month: monthQuerySchema.optional(),
 });

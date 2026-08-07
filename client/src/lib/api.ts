@@ -41,6 +41,7 @@ export interface TransactionFilters {
   type?: TransactionType | "all";
   category?: Category | "all";
   search?: string;
+  month?: string;
 }
 
 export class ApiError extends Error {
@@ -97,6 +98,9 @@ async function requestJson<T>(
 
 function buildTransactionQuery(filters: TransactionFilters = {}): string {
   const params = new URLSearchParams();
+  if (filters.month) {
+    params.set("month", filters.month);
+  }
   if (filters.type && filters.type !== "all") {
     params.set("type", filters.type);
   }
@@ -119,6 +123,14 @@ export function getTransactions(
     `/api/transactions${buildTransactionQuery(filters)}`,
     { signal },
   );
+}
+
+export interface TransactionMonthsResponse {
+  months: string[];
+}
+
+export function getTransactionMonths(): Promise<TransactionMonthsResponse> {
+  return requestJson<TransactionMonthsResponse>("/api/transactions/months");
 }
 
 export function createTransaction(
