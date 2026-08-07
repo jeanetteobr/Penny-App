@@ -1,28 +1,12 @@
 {
-  "name": "figma-make-app",
+  "name": "penny",
   "private": true,
   "version": "1.0.0",
-  "type": "module",
+  "packageManager": "pnpm@10.34.3",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
-    "format": "oxfmt"
-  },
-  "dependencies": {
-    "lucide-react": "^0.454.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.0.0",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^6.0.0",
-    "oxfmt": "^0.2.0",
-    "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0",
-    "vite": "^8.0.0"
+    "dev": "pnpm --parallel --filter @penny/client --filter @penny/server run dev",
+    "dev:client": "pnpm --filter @penny/client dev",
+    "dev:server": "pnpm --filter @penny/server dev",
+    "build": "pnpm --filter @penny/client --filter @penny/server run build"
   }
 }
