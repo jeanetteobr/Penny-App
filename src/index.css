@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --ink: #20231f;
+  --graphite: #5f625c;
+  --stone: #8d9088;
+  --canvas: #f7f5ef;
+  --paper: #fffefa;
+  --border: #dddcd5;
+  --soft-border: #ebe9e2;
+
+  --fern-700: #3f6549;
+  --fern-600: #527a5b;
+  --fern-200: #c7dac9;
+  --fern-100: #dde9dd;
+  --fern-50: #eff5ef;
+
+  --income-text: #3f7d58;
+  --income-bg: #e8f2eb;
+  --expense-text: #a94e3f;
+  --expense-bg: #f7e8e4;
+
+  --butter: #f2cf66;
+  --butter-soft: #fbf2cf;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: var(--canvas);
+  color: var(--ink);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: 'DM Mono', monospace;
+}
+
+/* Focus ring using fern brand color */
+:focus-visible {
+  outline: 2px solid var(--fern-600);
+  outline-offset: 2px;
+}
+
+/* Subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--soft-border);
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
