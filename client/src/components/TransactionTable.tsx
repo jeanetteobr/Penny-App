@@ -4,7 +4,10 @@ import type { Transaction } from '../types/transaction'
 
 interface Props {
   transactions: Transaction[]
-  allTransactions: Transaction[]
+  totalCount: number
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
   hasActiveFilters: boolean
   onEdit: (transaction: Transaction) => void
   onDelete: (transaction: Transaction) => void
@@ -22,14 +25,59 @@ const COL_HEADERS = [
 
 export default function TransactionTable({
   transactions,
-  allTransactions,
+  totalCount,
+  loading = false,
+  error = null,
+  onRetry,
   hasActiveFilters,
   onEdit,
   onDelete,
   onClearFilters,
   onAddTransaction,
 }: Props) {
-  if (allTransactions.length === 0) {
+  if (loading) {
+    return (
+      <div style={{ padding: '56px 0', textAlign: 'center' }}>
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px', color: 'var(--stone)', margin: 0 }}>
+          Loading transactions…
+        </p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '56px 0', textAlign: 'center' }}>
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
+          Transactions couldn't be loaded.
+        </p>
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '14px', color: 'var(--graphite)', margin: '0 0 20px' }}>
+          Check that the API is running, then try again.
+        </p>
+        {onRetry && (
+          <button
+            type="button"
+            onClick={onRetry}
+            style={{
+              backgroundColor: 'transparent',
+              color: 'var(--fern-600)',
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 600,
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--fern-200)',
+              cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (totalCount === 0 && !hasActiveFilters) {
     return (
       <div style={{ padding: '56px 0', textAlign: 'center' }}>
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
@@ -39,6 +87,7 @@ export default function TransactionTable({
           Add your first transaction to start seeing where your money goes.
         </p>
         <button
+          type="button"
           onClick={onAddTransaction}
           style={{
             backgroundColor: 'var(--fern-600)',
@@ -62,7 +111,7 @@ export default function TransactionTable({
     )
   }
 
-  if (transactions.length === 0 && hasActiveFilters) {
+  if (totalCount === 0 && hasActiveFilters) {
     return (
       <div style={{ padding: '56px 0', textAlign: 'center' }}>
         <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '15px', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
@@ -72,6 +121,7 @@ export default function TransactionTable({
           Try changing your search or clearing a filter.
         </p>
         <button
+          type="button"
           onClick={onClearFilters}
           style={{
             backgroundColor: 'transparent',

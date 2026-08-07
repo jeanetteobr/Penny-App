@@ -1,66 +1,66 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import FilterToolbar from './FilterToolbar'
 import TransactionTable from './TransactionTable'
 import Pagination from './Pagination'
 import AddTransactionCard from './AddTransactionCard'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types/transaction'
 import type { Transaction, TransactionType, Category } from '../types/transaction'
 
 const ITEMS_PER_PAGE = 10
+const AVAILABLE_CATEGORIES = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES] as Category[]
 
 interface Props {
   transactions: Transaction[]
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
+  search: string
+  typeFilter: TransactionType | 'all'
   categoryFilter: Category | 'all'
+  onSearchChange: (value: string) => void
+  onTypeFilterChange: (value: TransactionType | 'all') => void
   onCategoryFilterChange: (cat: Category | 'all') => void
   onAddTransaction: () => void
-  onSaveNewTransaction: (data: Omit<Transaction, 'id'>) => void
+  onSaveNewTransaction: (data: Omit<Transaction, 'id'>) => Promise<void>
   onEditTransaction: (transaction: Transaction) => void
   onDeleteTransaction: (transaction: Transaction) => void
 }
 
 export default function RecentActivity({
   transactions,
+  loading = false,
+  error = null,
+  onRetry,
+  search,
+  typeFilter,
   categoryFilter,
+  onSearchChange,
+  onTypeFilterChange,
   onCategoryFilterChange,
   onAddTransaction,
   onSaveNewTransaction,
   onEditTransaction,
   onDeleteTransaction,
 }: Props) {
-  const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const availableCategories = useMemo(() => {
-    const cats = new Set(transactions.map((t) => t.category))
-    return Array.from(cats).sort() as Category[]
-  }, [transactions])
-
   const hasActiveFilters = search !== '' || typeFilter !== 'all' || categoryFilter !== 'all'
-
-  const filtered = useMemo(() => {
-    return transactions.filter((t) => {
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false
-      if (typeFilter !== 'all' && t.type !== typeFilter) return false
-      if (categoryFilter !== 'all' && t.category !== categoryFilter) return false
-      return true
-    })
-  }, [transactions, search, typeFilter, categoryFilter])
 
   useEffect(() => {
     setCurrentPage(1)
   }, [search, typeFilter, categoryFilter, transactions])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE))
 
-  const pagedRows = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE
-    return filtered.slice(start, start + ITEMS_PER_PAGE)
-  }, [filtered, currentPage])
+  const pagedRows = transactions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  )
 
   function clearFilters() {
-    setSearch('')
-    setTypeFilter('all')
+    onSearchChange('')
+    onTypeFilterChange('all')
     onCategoryFilterChange('all')
   }
 
@@ -68,18 +68,21 @@ export default function RecentActivity({
     <>
       <TransactionTable
         transactions={pagedRows}
-        allTransactions={transactions}
+        totalCount={transactions.length}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
         hasActiveFilters={hasActiveFilters}
         onEdit={onEditTransaction}
         onDelete={onDeleteTransaction}
         onClearFilters={clearFilters}
         onAddTransaction={onAddTransaction}
       />
-      {filtered.length > 0 && (
+      {!loading && !error && transactions.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filtered.length}
+          totalItems={transactions.length}
           itemsPerPage={ITEMS_PER_PAGE}
           onPageChange={setCurrentPage}
         />
@@ -91,7 +94,6 @@ export default function RecentActivity({
     <section id="recent-activity">
       {/* ── Desktop / tablet layout ───────────────────────────── */}
       <div className="ra-desktop">
-        {/* Heading row with filters inline */}
         <div
           style={{
             display: 'flex',
@@ -102,6 +104,7 @@ export default function RecentActivity({
           }}
         >
           <h2
+            tabIndex={-1}
             style={{
               fontFamily: "'DM Sans', sans-serif",
               fontSize: '26px',
@@ -111,6 +114,7 @@ export default function RecentActivity({
               marginRight: 'auto',
               letterSpacing: '-0.01em',
               whiteSpace: 'nowrap',
+              outline: 'none',
             }}
           >
             Recent activity.
@@ -119,17 +123,16 @@ export default function RecentActivity({
             search={search}
             typeFilter={typeFilter}
             categoryFilter={categoryFilter}
-            availableCategories={availableCategories}
+            availableCategories={AVAILABLE_CATEGORIES}
             hasActiveFilters={hasActiveFilters}
-            onSearchChange={setSearch}
-            onTypeChange={setTypeFilter}
+            onSearchChange={onSearchChange}
+            onTypeChange={onTypeFilterChange}
             onCategoryChange={onCategoryFilterChange}
             onClear={clearFilters}
             inline
           />
         </div>
 
-        {/* Table + add card side by side */}
         <div
           style={{
             display: 'grid',
@@ -156,6 +159,7 @@ export default function RecentActivity({
           }}
         >
           <h2
+            tabIndex={-1}
             style={{
               fontFamily: "'DM Sans', sans-serif",
               fontSize: '22px',
@@ -163,11 +167,13 @@ export default function RecentActivity({
               color: 'var(--ink)',
               margin: 0,
               letterSpacing: '-0.01em',
+              outline: 'none',
             }}
           >
             Recent activity.
           </h2>
           <button
+            type="button"
             onClick={onAddTransaction}
             style={{
               backgroundColor: 'var(--fern-600)',
@@ -192,10 +198,10 @@ export default function RecentActivity({
           search={search}
           typeFilter={typeFilter}
           categoryFilter={categoryFilter}
-          availableCategories={availableCategories}
+          availableCategories={AVAILABLE_CATEGORIES}
           hasActiveFilters={hasActiveFilters}
-          onSearchChange={setSearch}
-          onTypeChange={setTypeFilter}
+          onSearchChange={onSearchChange}
+          onTypeChange={onTypeFilterChange}
           onCategoryChange={onCategoryFilterChange}
           onClear={clearFilters}
         />

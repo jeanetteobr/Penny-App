@@ -4,7 +4,7 @@ import type { Transaction } from '../types/transaction'
 
 interface Props {
   transaction: Transaction
-  onConfirm: () => void
+  onConfirm: () => Promise<void>
   onCancel: () => void
 }
 
@@ -12,6 +12,8 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
   const modalRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   const [visible, setVisible] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true))
@@ -39,13 +41,22 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleCancel() {
+    if (deleting) return
     setVisible(false)
     setTimeout(onCancel, 180)
   }
 
-  function handleConfirm() {
-    setVisible(false)
-    setTimeout(onConfirm, 180)
+  async function handleConfirm() {
+    if (deleting) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await onConfirm()
+      setVisible(false)
+    } catch (err) {
+      setDeleting(false)
+      setError(err instanceof Error ? err.message : 'Transaction could not be deleted.')
+    }
   }
 
   return (
@@ -138,7 +149,9 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             ref={cancelRef}
+            type="button"
             onClick={handleCancel}
+            disabled={deleting}
             style={{
               flex: 1,
               padding: '10px 0',
@@ -149,11 +162,14 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
               fontSize: '14px',
               fontWeight: 600,
               color: 'var(--graphite)',
-              cursor: 'pointer',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              opacity: deleting ? 0.7 : 1,
               transition: 'background-color 150ms',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--canvas)'
+              if (!deleting) {
+                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--canvas)'
+              }
             }}
             onMouseLeave={(e) => {
               ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
@@ -162,7 +178,12 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
             Cancel
           </button>
           <button
-            onClick={handleConfirm}
+            type="button"
+            onClick={() => {
+              void handleConfirm()
+            }}
+            disabled={deleting}
+            aria-busy={deleting}
             style={{
               flex: 1,
               padding: '10px 0',
@@ -173,19 +194,35 @@ export default function DeleteModal({ transaction, onConfirm, onCancel }: Props)
               fontSize: '14px',
               fontWeight: 600,
               color: 'var(--expense-text)',
-              cursor: 'pointer',
+              cursor: deleting ? 'not-allowed' : 'pointer',
+              opacity: deleting ? 0.75 : 1,
               transition: 'background-color 150ms',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f5d5d1'
+              if (!deleting) {
+                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f5d5d1'
+              }
             }}
             onMouseLeave={(e) => {
               ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--expense-bg)'
             }}
           >
-            Delete
+            {deleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
+        {error && (
+          <p
+            role="alert"
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: '12px',
+              color: 'var(--expense-text)',
+              margin: '12px 0 0',
+            }}
+          >
+            {error}
+          </p>
+        )}
       </div>
     </>
   )

@@ -1,50 +1,116 @@
-import { useState, useMemo } from 'react'
-import { INITIAL_TRANSACTIONS } from '../data/transactions'
-import type { Transaction } from '../types/transaction'
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createTransaction,
+  deleteTransaction as deleteTransactionRequest,
+  getErrorMessage,
+  getTransactions,
+  updateTransaction as updateTransactionRequest,
+  type TransactionFilters,
+  type TransactionInput,
+} from "../lib/api";
+import type { Transaction } from "../types/transaction";
 
-let nextId = INITIAL_TRANSACTIONS.length + 1
+const SEARCH_DEBOUNCE_MS = 250;
 
-export function useTransactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS)
+export function useTransactions(filters: TransactionFilters) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(
+    filters.search?.trim() ?? "",
+  );
+  const requestIdRef = useRef(0);
 
-  const totalIncome = useMemo(
-    () => transactions.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  )
+  useEffect(() => {
+    const nextSearch = filters.search?.trim() ?? "";
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(nextSearch);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [filters.search]);
 
-  const totalExpenses = useMemo(
-    () => transactions.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
-    [transactions]
-  )
+  const refresh = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(null);
 
-  const balance = totalIncome - totalExpenses
+    try {
+      const next = await getTransactions({
+        type: filters.type,
+        category: filters.category,
+        search: debouncedSearch,
+      });
+      if (requestId !== requestIdRef.current) return;
+      setTransactions(next);
+    } catch (err) {
+      if (requestId !== requestIdRef.current) return;
+      setError(getErrorMessage(err, "Transactions couldn't be loaded."));
+      setTransactions([]);
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [debouncedSearch, filters.category, filters.type]);
 
-  function addTransaction(data: Omit<Transaction, 'id'>) {
-    const newTransaction: Transaction = { ...data, id: String(nextId++) }
-    setTransactions((prev) =>
-      [newTransaction, ...prev].sort((a, b) => b.date.localeCompare(a.date))
-    )
+  useEffect(() => {
+    const requestId = ++requestIdRef.current;
+    const controller = new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    void (async () => {
+      try {
+        const next = await getTransactions(
+          {
+            type: filters.type,
+            category: filters.category,
+            search: debouncedSearch,
+          },
+          controller.signal,
+        );
+        if (requestId !== requestIdRef.current) return;
+        setTransactions(next);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        if (requestId !== requestIdRef.current) return;
+        setError(getErrorMessage(err, "Transactions couldn't be loaded."));
+        setTransactions([]);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [debouncedSearch, filters.category, filters.type]);
+
+  async function addTransaction(data: TransactionInput): Promise<void> {
+    await createTransaction(data);
   }
 
-  function updateTransaction(updated: Transaction) {
-    setTransactions((prev) =>
-      prev
-        .map((t) => (t.id === updated.id ? updated : t))
-        .sort((a, b) => b.date.localeCompare(a.date))
-    )
+  async function updateTransaction(
+    id: string,
+    data: TransactionInput,
+  ): Promise<void> {
+    await updateTransactionRequest(id, data);
   }
 
-  function deleteTransaction(id: string) {
-    setTransactions((prev) => prev.filter((t) => t.id !== id))
+  async function deleteTransaction(id: string): Promise<void> {
+    await deleteTransactionRequest(id);
   }
 
   return {
     transactions,
-    totalIncome,
-    totalExpenses,
-    balance,
+    loading,
+    error,
+    refresh,
     addTransaction,
     updateTransaction,
     deleteTransaction,
-  }
+  };
 }

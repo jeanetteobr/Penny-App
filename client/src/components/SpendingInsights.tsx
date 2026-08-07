@@ -18,10 +18,19 @@ const CATEGORY_ICONS: Record<Category, React.ComponentType<{ size?: number; stro
 
 interface Props {
   insights: InsightsData
+  loading?: boolean
+  error?: string | null
+  onRetry?: () => void
   onViewCategory?: (category: Category) => void
 }
 
-export default function SpendingInsights({ insights, onViewCategory }: Props) {
+export default function SpendingInsights({
+  insights,
+  loading = false,
+  error = null,
+  onRetry,
+  onViewCategory,
+}: Props) {
   const {
     hasEnoughData,
     emptyReason,
@@ -38,7 +47,7 @@ export default function SpendingInsights({ insights, onViewCategory }: Props) {
         primary: 'No spending insights yet.',
         secondary: 'Add a few expenses to start seeing patterns in your spending.',
       }
-    if (emptyReason === 'all-housing')
+    if (emptyReason === 'no-non-housing-expenses')
       return {
         primary: 'No non-housing spending to compare yet.',
         secondary: null,
@@ -87,7 +96,55 @@ export default function SpendingInsights({ insights, onViewCategory }: Props) {
         </p>
       </div>
 
-      {!hasEnoughData ? (
+      {error ? (
+        <div style={{ padding: '8px 0 4px' }}>
+          <p
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: '14px',
+              fontWeight: 500,
+              color: 'var(--graphite)',
+              margin: '0 0 10px',
+              lineHeight: 1.45,
+            }}
+          >
+            Spending insights couldn't be loaded.
+          </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              style={{
+                backgroundColor: 'transparent',
+                color: 'var(--fern-600)',
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: '13px',
+                fontWeight: 600,
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--fern-200)',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+      ) : loading ? (
+        <div style={{ padding: '8px 0 4px' }}>
+          <p
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: '14px',
+              color: 'var(--stone)',
+              margin: 0,
+              lineHeight: 1.45,
+            }}
+          >
+            Loading insights…
+          </p>
+        </div>
+      ) : !hasEnoughData ? (
         (() => {
           const msg = emptyMessage()
           return (

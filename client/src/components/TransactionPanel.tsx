@@ -23,7 +23,7 @@ interface FormErrors {
 interface Props {
   mode: 'add' | 'edit'
   transaction?: Transaction
-  onSave: (data: Omit<Transaction, 'id'>) => void
+  onSave: (data: Omit<Transaction, 'id'>) => Promise<void>
   onClose: () => void
 }
 
@@ -41,6 +41,8 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
   }
   const [form, setForm] = useState<FormState>(initial)
   const [errors, setErrors] = useState<FormErrors>({})
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [amountDisplay, setAmountDisplay] = useState(
     transaction?.amount ? transaction.amount.toFixed(2) : ''
   )
@@ -118,17 +120,27 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
     return Object.keys(errs).length === 0
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!validate()) return
-    onSave({
-      type: form.type,
-      description: form.description.trim(),
-      amount: parseFloat(form.amount),
-      category: form.category as Category,
-      date: form.date,
-    })
-    handleClose()
+    if (!validate() || submitting) return
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await onSave({
+        type: form.type,
+        description: form.description.trim(),
+        amount: parseFloat(form.amount),
+        category: form.category as Category,
+        date: form.date,
+      })
+      handleClose()
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : 'Transaction could not be saved.',
+      )
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const categories = form.type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
@@ -462,6 +474,7 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
             <button
               type="button"
               onClick={handleClose}
+              disabled={submitting}
               style={{
                 flex: 1,
                 padding: '11px 0',
@@ -472,11 +485,14 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
                 fontSize: '15px',
                 fontWeight: 600,
                 color: 'var(--graphite)',
-                cursor: 'pointer',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.7 : 1,
                 transition: 'background-color 150ms',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--canvas)'
+                if (!submitting) {
+                  ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--canvas)'
+                }
               }}
               onMouseLeave={(e) => {
                 ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'
@@ -486,6 +502,8 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
             </button>
             <button
               type="submit"
+              disabled={submitting}
+              aria-busy={submitting}
               style={{
                 flex: 2,
                 padding: '11px 0',
@@ -496,19 +514,33 @@ export default function TransactionPanel({ mode, transaction, onSave, onClose }:
                 fontSize: '15px',
                 fontWeight: 600,
                 color: '#fff',
-                cursor: 'pointer',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.75 : 1,
                 transition: 'background-color 150ms',
               }}
               onMouseEnter={(e) => {
-                ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--fern-700)'
+                if (!submitting) {
+                  ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--fern-700)'
+                }
               }}
               onMouseLeave={(e) => {
                 ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--fern-600)'
               }}
             >
-              {mode === 'add' ? 'Add transaction' : 'Save changes'}
+              {submitting
+                ? mode === 'add'
+                  ? 'Adding…'
+                  : 'Saving…'
+                : mode === 'add'
+                  ? 'Add transaction'
+                  : 'Save changes'}
             </button>
           </div>
+          {submitError && (
+            <p style={{ ...errorStyle, marginTop: '10px' }} role="alert">
+              {submitError}
+            </p>
+          )}
         </form>
       </div>
     </>

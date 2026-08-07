@@ -6,8 +6,9 @@ import RecentActivity from './components/RecentActivity'
 import TransactionPanel from './components/TransactionPanel'
 import DeleteModal from './components/DeleteModal'
 import { useTransactions } from './hooks/useTransactions'
-import { useInsights } from './hooks/useInsights'
-import type { Transaction, Category } from './types/transaction'
+import { useInsights, INSIGHTS_MONTH } from './hooks/useInsights'
+import { useSummary } from './hooks/useSummary'
+import type { Transaction, Category, TransactionType } from './types/transaction'
 
 type PanelState =
   | { mode: 'closed' }
@@ -15,15 +16,50 @@ type PanelState =
   | { mode: 'edit'; transaction: Transaction }
 
 export default function App() {
-  const { transactions, totalIncome, totalExpenses, balance, addTransaction, updateTransaction, deleteTransaction } =
-    useTransactions()
-  const insights = useInsights(transactions)
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all')
+
+  const {
+    summary,
+    loading: summaryLoading,
+    error: summaryError,
+    refresh: refreshSummary,
+  } = useSummary()
+
+  const {
+    insights,
+    loading: insightsLoading,
+    error: insightsError,
+    refresh: refreshInsights,
+  } = useInsights(INSIGHTS_MONTH)
+
+  const {
+    transactions,
+    loading: transactionsLoading,
+    error: transactionsError,
+    refresh: refreshTransactions,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+  } = useTransactions({
+    search,
+    type: typeFilter,
+    category: categoryFilter,
+  })
 
   const [panel, setPanel] = useState<PanelState>({ mode: 'closed' })
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
-  const [categoryFilter, setCategoryFilter] = useState<Category | 'all'>('all')
 
   const addTriggerRef = useRef<HTMLElement | null>(null)
+
+  async function refreshBudgetData() {
+    await Promise.allSettled([
+      refreshTransactions(),
+      refreshSummary(),
+      refreshInsights(),
+    ])
+  }
 
   function openAdd(triggerEl?: HTMLElement) {
     if (triggerEl) addTriggerRef.current = triggerEl
@@ -39,23 +75,28 @@ export default function App() {
     setTimeout(() => addTriggerRef.current?.focus(), 50)
   }
 
-  function handleSave(data: Omit<Transaction, 'id'>) {
+  async function handleSave(data: Omit<Transaction, 'id'>) {
     if (panel.mode === 'add') {
-      addTransaction(data)
+      await addTransaction(data)
     } else if (panel.mode === 'edit') {
-      updateTransaction({ ...data, id: panel.transaction.id })
+      await updateTransaction(panel.transaction.id, data)
+    } else {
+      return
     }
+    // Write already succeeded; refresh failures must not surface as save failures.
+    void refreshBudgetData()
   }
 
   function openDelete(transaction: Transaction) {
     setDeletingTransaction(transaction)
   }
 
-  function confirmDelete() {
-    if (deletingTransaction) {
-      deleteTransaction(deletingTransaction.id)
-      setDeletingTransaction(null)
-    }
+  async function confirmDelete() {
+    if (!deletingTransaction) return
+    await deleteTransaction(deletingTransaction.id)
+    setDeletingTransaction(null)
+    // Write already succeeded; refresh failures must not surface as delete failures.
+    void refreshBudgetData()
   }
 
   function handleViewCategory(category: Category) {
@@ -64,7 +105,6 @@ export default function App() {
     if (!el) return
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     el.scrollIntoView({ behavior: prefersReducedMotion ? 'instant' : 'smooth', block: 'start' })
-    // Move focus to the section heading so keyboard/screen-reader users know where they are
     setTimeout(
       () => {
         const heading = el.querySelector<HTMLElement>('h2')
@@ -93,21 +133,47 @@ export default function App() {
           className="dashboard-grid"
         >
           <BalanceSection
-            balance={balance}
-            totalIncome={totalIncome}
-            totalExpenses={totalExpenses}
+            balance={summary?.balance ?? 0}
+            totalIncome={summary?.income ?? 0}
+            totalExpenses={summary?.expenses ?? 0}
+            loading={summaryLoading}
+            error={summaryError}
+            onRetry={() => {
+              void refreshSummary()
+            }}
           />
-          <SpendingInsights insights={insights} onViewCategory={handleViewCategory} />
+          <SpendingInsights
+            insights={insights}
+            loading={insightsLoading}
+            error={insightsError}
+            onRetry={() => {
+              void refreshInsights()
+            }}
+            onViewCategory={handleViewCategory}
+          />
         </div>
 
         <hr style={{ border: 'none', borderTop: '1px solid var(--soft-border)', marginBottom: '40px' }} />
 
         <RecentActivity
           transactions={transactions}
+          loading={transactionsLoading}
+          error={transactionsError}
+          onRetry={() => {
+            void refreshTransactions()
+          }}
+          search={search}
+          typeFilter={typeFilter}
           categoryFilter={categoryFilter}
+          onSearchChange={setSearch}
+          onTypeFilterChange={setTypeFilter}
           onCategoryFilterChange={setCategoryFilter}
           onAddTransaction={() => openAdd()}
-          onSaveNewTransaction={addTransaction}
+          onSaveNewTransaction={async (data) => {
+            await addTransaction(data)
+            // Write already succeeded; refresh failures must not surface as add failures.
+            void refreshBudgetData()
+          }}
           onEditTransaction={openEdit}
           onDeleteTransaction={openDelete}
         />

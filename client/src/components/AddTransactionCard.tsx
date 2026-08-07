@@ -6,13 +6,14 @@ import type { Transaction, TransactionType, Category } from '../types/transactio
 const TODAY = '2026-08-07'
 
 interface Props {
-  onSave: (data: Omit<Transaction, 'id'>) => void
+  onSave: (data: Omit<Transaction, 'id'>) => Promise<void>
 }
 
 interface FormErrors {
   description?: string
   amount?: string
   category?: string
+  submit?: string
 }
 
 export default function AddTransactionCard({ onSave }: Props) {
@@ -23,6 +24,7 @@ export default function AddTransactionCard({ onSave }: Props) {
   const [category, setCategory] = useState<Category | ''>('')
   const [date, setDate] = useState(TODAY)
   const [errors, setErrors] = useState<FormErrors>({})
+  const [submitting, setSubmitting] = useState(false)
 
   function reset() {
     setType('expense')
@@ -54,12 +56,29 @@ export default function AddTransactionCard({ onSave }: Props) {
     return Object.keys(errs).length === 0
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!validate()) return
+    if (!validate() || submitting) return
     const num = parseFloat(amountDisplay.replace(/[^0-9.]/g, ''))
-    onSave({ type, description: description.trim(), amount: num, category: category as Category, date })
-    reset()
+    setSubmitting(true)
+    setErrors((er) => ({ ...er, submit: undefined }))
+    try {
+      await onSave({
+        type,
+        description: description.trim(),
+        amount: num,
+        category: category as Category,
+        date,
+      })
+      reset()
+    } catch (err) {
+      setErrors((er) => ({
+        ...er,
+        submit: err instanceof Error ? err.message : 'Transaction could not be saved.',
+      }))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const categories = type === 'expense' ? EXPENSE_CATEGORIES : INCOME_CATEGORIES
@@ -363,6 +382,8 @@ export default function AddTransactionCard({ onSave }: Props) {
           </button>
           <button
             type="submit"
+            disabled={submitting}
+            aria-busy={submitting}
             style={{
               flex: 2,
               padding: '9px 0',
@@ -373,26 +394,30 @@ export default function AddTransactionCard({ onSave }: Props) {
               fontSize: '13px',
               fontWeight: 600,
               color: '#fff',
-              cursor: 'pointer',
+              cursor: submitting ? 'not-allowed' : 'pointer',
+              opacity: submitting ? 0.75 : 1,
               transition: 'background-color 150ms',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--fern-700)' }}
+            onMouseEnter={(e) => {
+              if (!submitting) e.currentTarget.style.backgroundColor = 'var(--fern-700)'
+            }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--fern-600)' }}
           >
-            Add transaction
+            {submitting ? 'Adding…' : 'Add transaction'}
           </button>
         </div>
 
-        {Object.keys(errors).length > 0 && (
+        {errors.submit && (
           <p
+            role="alert"
             style={{
               fontFamily: "'DM Sans', sans-serif",
               fontSize: '11px',
-              color: 'var(--stone)',
+              color: 'var(--expense-text)',
               margin: '10px 0 0',
             }}
           >
-            Amounts must be greater than $0.
+            {errors.submit}
           </p>
         )}
       </form>

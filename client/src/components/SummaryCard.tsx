@@ -4,9 +4,10 @@ import { formatCurrency } from '../utils/format'
 interface Props {
   type: 'income' | 'expense'
   amount: number
+  loading?: boolean
 }
 
-export default function SummaryCard({ type, amount }: Props) {
+export default function SummaryCard({ type, amount, loading = false }: Props) {
   const isIncome = type === 'income'
   return (
     <div
@@ -60,7 +61,12 @@ export default function SummaryCard({ type, amount }: Props) {
             letterSpacing: '-0.02em',
           }}
         >
-          {isIncome ? '+' : '−'}{formatCurrency(amount)}
+          {loading ? '—' : (
+            <>
+              {isIncome ? '+' : '−'}
+              {formatCurrency(amount)}
+            </>
+          )}
         </div>
       </div>
     </div>

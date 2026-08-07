@@ -1,33 +1,43 @@
-import { useMemo } from 'react'
-import type { Transaction, Category } from '../types/transaction'
+import { useCallback, useEffect, useState } from "react";
+import {
+  getErrorMessage,
+  getInsights,
+  type CategoryInsight,
+  type LargestExpenseInsight,
+  type SpendingInsightStatus,
+} from "../lib/api";
+import type { Category } from "../types/transaction";
+
+/** Dashboard period represented by the current Penny UI. */
+export const INSIGHTS_MONTH = "2026-08";
 
 export interface CategoryBreakdown {
-  category: Category
-  amount: number
-  percentage: number
+  category: Category;
+  amount: number;
+  percentage: number;
 }
 
 export type InsightsEmptyReason =
-  | 'no-expenses'       // zero expense transactions this month
-  | 'insufficient-data' // fewer than 3 expense transactions
-  | 'all-housing'       // all expenses are Housing
-  | null
+  | "no-expenses"
+  | "insufficient-data"
+  | "no-non-housing-expenses"
+  | null;
 
 export interface InsightsData {
-  hasEnoughData: boolean
-  emptyReason: InsightsEmptyReason
-  topCategory: Category | null
-  topCategoryAmount: number
-  topCategoryPercentage: number
-  categoryBreakdown: CategoryBreakdown[]
-  largestExpense: Transaction | null
-  nonHousingTotal: number
+  status: SpendingInsightStatus | null;
+  hasEnoughData: boolean;
+  emptyReason: InsightsEmptyReason;
+  topCategory: Category | null;
+  topCategoryAmount: number;
+  topCategoryPercentage: number;
+  categoryBreakdown: CategoryBreakdown[];
+  largestExpense: LargestExpenseInsight | null;
+  nonHousingTotal: number;
+  month: string;
 }
 
-// Insights are scoped to August 2026 (current month in the prototype)
-const INSIGHTS_MONTH = '2026-08'
-
 const EMPTY: InsightsData = {
+  status: null,
   hasEnoughData: false,
   emptyReason: null,
   topCategory: null,
@@ -36,60 +46,64 @@ const EMPTY: InsightsData = {
   categoryBreakdown: [],
   largestExpense: null,
   nonHousingTotal: 0,
+  month: INSIGHTS_MONTH,
+};
+
+function mapStatusToEmptyReason(
+  status: SpendingInsightStatus,
+): InsightsEmptyReason {
+  if (status === "ready") return null;
+  if (status === "no-expenses") return "no-expenses";
+  if (status === "no-non-housing-expenses") return "no-non-housing-expenses";
+  return "insufficient-data";
 }
 
-export function useInsights(transactions: Transaction[]): InsightsData {
-  return useMemo(() => {
-    const currentMonthExpenses = transactions.filter(
-      (t) => t.type === 'expense' && t.date.startsWith(INSIGHTS_MONTH)
-    )
+function mapInsights(
+  response: Awaited<ReturnType<typeof getInsights>>,
+): InsightsData {
+  const top: CategoryInsight | null = response.topCategory;
 
-    if (currentMonthExpenses.length === 0) {
-      return { ...EMPTY, emptyReason: 'no-expenses' }
+  return {
+    status: response.status,
+    hasEnoughData: response.status === "ready",
+    emptyReason: mapStatusToEmptyReason(response.status),
+    topCategory: top?.category ?? null,
+    topCategoryAmount: top?.amount ?? 0,
+    topCategoryPercentage: top?.percentage ?? 0,
+    categoryBreakdown: response.categories,
+    largestExpense: response.largestExpense,
+    nonHousingTotal: response.totalNonHousingSpending,
+    month: response.month,
+  };
+}
+
+export function useInsights(month: string = INSIGHTS_MONTH) {
+  const [insights, setInsights] = useState<InsightsData>(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getInsights(month);
+      setInsights(mapInsights(response));
+    } catch (err) {
+      setError(getErrorMessage(err, "Spending insights couldn't be loaded."));
+      setInsights(EMPTY);
+    } finally {
+      setLoading(false);
     }
+  }, [month]);
 
-    if (currentMonthExpenses.length < 3) {
-      return { ...EMPTY, emptyReason: 'insufficient-data' }
-    }
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
-    const nonHousingExpenses = currentMonthExpenses.filter((t) => t.category !== 'Housing')
-
-    if (nonHousingExpenses.length === 0) {
-      return { ...EMPTY, emptyReason: 'all-housing' }
-    }
-
-    // Largest single expense in the current month (includes Housing)
-    const largestExpense = currentMonthExpenses.reduce<Transaction | null>(
-      (max, t) => (max === null || t.amount > max.amount ? t : max),
-      null
-    )
-
-    const nonHousingTotal = nonHousingExpenses.reduce((sum, t) => sum + t.amount, 0)
-
-    const byCategory = new Map<Category, number>()
-    for (const t of nonHousingExpenses) {
-      byCategory.set(t.category, (byCategory.get(t.category) ?? 0) + t.amount)
-    }
-
-    const categoryBreakdown: CategoryBreakdown[] = Array.from(byCategory.entries())
-      .map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: nonHousingTotal > 0 ? (amount / nonHousingTotal) * 100 : 0,
-      }))
-      .sort((a, b) => b.amount - a.amount)
-
-    const top = categoryBreakdown[0]
-
-    return {
-      hasEnoughData: true,
-      emptyReason: null,
-      topCategory: top.category,
-      topCategoryAmount: top.amount,
-      topCategoryPercentage: top.percentage,
-      categoryBreakdown,
-      largestExpense,
-      nonHousingTotal,
-    }
-  }, [transactions])
+  return {
+    insights,
+    loading,
+    error,
+    refresh,
+  };
 }
