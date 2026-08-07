@@ -12,7 +12,7 @@ Penny is a functionally complete full-stack take-home application.
 
 The current implementation includes:
 
-- Persisted transaction CRUD with JSON-file storage
+- Persisted transaction CRUD with a local SQLite database
 - Server-side search and filtering
 - Budget summary (income, expenses, balance)
 - Month-scoped spending insights
@@ -31,7 +31,7 @@ The current implementation includes:
 - View current balance, total income, and total expenses
 - Search transaction descriptions
 - Filter by transaction type and category
-- JSON-backed persistence across local server restarts
+- SQLite-backed persistence across local server restarts
 
 ### Spending insights
 
@@ -63,7 +63,7 @@ Housing is excluded from the category-comparison calculation so day-to-day categ
 - TypeScript
 - Express
 - Zod
-- JSON file persistence
+- SQLite (`better-sqlite3`)
 
 ### Testing / tooling
 
@@ -82,7 +82,7 @@ Express API routes
   ↓
 services (transactions, summary, insights)
   ↓
-server/src/data/transactions.json
+SQLite (`server/data/penny.db`)
 ```
 
 The backend is the source of truth for:
@@ -110,8 +110,9 @@ Penny-App/
 │   ├── package.json
 │   └── vite.config.ts
 ├── server/
+│   ├── data/                 # runtime SQLite DB (gitignored)
 │   ├── src/
-│   │   ├── data/
+│   │   ├── db/
 │   │   ├── routes/
 │   │   ├── schemas/
 │   │   ├── services/
@@ -287,9 +288,11 @@ The frontend maps this response into the **A little perspective** presentation a
 
 ## Persistence
 
-Transactions are stored in `server/src/data/transactions.json`.
+Transactions are stored in a local SQLite database at `server/data/penny.db` (created automatically on first run; gitignored).
 
-For the take-home scope, Penny uses lightweight JSON-file persistence instead of a database. Writes use a temporary file plus rename so updates are atomic for local development. This is intentionally simple and is not production-ready storage.
+On first startup, Penny creates the `transactions` table and seeds the canonical 17-row demo dataset. Later startups leave existing data alone — including an intentionally empty table — so deleting every transaction does not cause the seed data to reappear.
+
+For the take-home scope, file-backed SQLite keeps persistence understandable without introducing a separate database server. An optional `PENNY_DB_PATH` environment variable can override the default database file location.
 
 ## Validation
 
@@ -307,13 +310,15 @@ Create and update requests are validated on the server with Zod, including:
 pnpm --filter @penny/server test
 ```
 
-Server unit tests cover derived financial logic, including:
+Server unit tests cover derived financial logic and SQLite initialization, including:
 
 - Summary calculations and currency rounding
 - Month-scoped spending insights
 - Housing exclusion from category comparison
 - Insight sufficiency / empty states
 - Deterministic tie-breaking
+- Fresh-database schema creation and canonical seeding
+- Idempotent initialization (existing empty databases are not reseeded)
 
 The client does not currently have an automated test suite.
 
@@ -332,14 +337,17 @@ Accessibility is part of the product: semantic markup, visible labels, keyboard 
 
 - No authentication (single-user local app)
 - Local-only; no production deployment required
-- Lightweight JSON persistence (no external database)
+- Local SQLite file persistence (no external database server)
 - Architecture favors clarity and maintainability over production infrastructure
 
 ## Environment Variables
 
 Penny does not require environment variables for normal local use.
 
-The server defaults to port `3001` and respects `PORT` when set:
+| Variable | Description |
+| --- | --- |
+| `PORT` | API server port (default `3001`) |
+| `PENNY_DB_PATH` | Optional override for the SQLite database file path |
 
 ```bash
 PORT=4000 pnpm dev:server

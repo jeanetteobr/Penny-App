@@ -13,3 +13,6 @@ logs/
 package-lock.json
 npm-shrinkwrap.json
 yarn.lock
+
+# Penny runtime SQLite database (and common sidecars)
+server/data/

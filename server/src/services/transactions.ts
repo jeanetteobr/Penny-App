@@ -1,11 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { getDatabase } from "../db/database.js";
 import type { Transaction, TransactionInput } from "../types/transaction.js";
-
-const DATA_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "../data");
-const DATA_FILE = path.join(DATA_DIR, "transactions.json");
 
 export interface TransactionFilters {
   type?: Transaction["type"];
@@ -13,81 +8,90 @@ export interface TransactionFilters {
   search?: string;
 }
 
-function sortTransactions(transactions: Transaction[]): Transaction[] {
-  return [...transactions].sort((a, b) => {
-    if (a.date !== b.date) {
-      return a.date < b.date ? 1 : -1;
-    }
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-  });
+interface TransactionRow {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  type: Transaction["type"];
+  category: Transaction["category"];
 }
 
-async function readAllTransactions(): Promise<Transaction[]> {
-  const raw = await readFile(DATA_FILE, "utf8");
-  const parsed: unknown = JSON.parse(raw);
-
-  if (!Array.isArray(parsed)) {
-    throw new Error("transactions.json must contain an array");
-  }
-
-  return parsed as Transaction[];
-}
-
-async function writeAllTransactions(transactions: Transaction[]): Promise<void> {
-  await mkdir(DATA_DIR, { recursive: true });
-
-  const payload = `${JSON.stringify(transactions, null, 2)}\n`;
-  const tempFile = path.join(DATA_DIR, `.transactions.${randomUUID()}.tmp`);
-
-  try {
-    await writeFile(tempFile, payload, "utf8");
-    await rename(tempFile, DATA_FILE);
-  } catch (error) {
-    await unlink(tempFile).catch(() => undefined);
-    throw error;
-  }
+function mapRow(row: TransactionRow): Transaction {
+  return {
+    id: row.id,
+    date: row.date,
+    description: row.description,
+    amount: row.amount,
+    type: row.type,
+    category: row.category,
+  };
 }
 
 export async function getTransactions(
   filters: TransactionFilters = {},
 ): Promise<Transaction[]> {
-  const transactions = await readAllTransactions();
-  const search = filters.search?.trim().toLowerCase();
+  const db = getDatabase();
+  const clauses: string[] = [];
+  const params: unknown[] = [];
 
-  const filtered = transactions.filter((transaction) => {
-    if (filters.type && transaction.type !== filters.type) {
-      return false;
-    }
-    if (filters.category && transaction.category !== filters.category) {
-      return false;
-    }
-    if (search && !transaction.description.toLowerCase().includes(search)) {
-      return false;
-    }
-    return true;
-  });
+  if (filters.type) {
+    clauses.push("type = ?");
+    params.push(filters.type);
+  }
+  if (filters.category) {
+    clauses.push("category = ?");
+    params.push(filters.category);
+  }
 
-  return sortTransactions(filtered);
+  const search = filters.search?.trim();
+  if (search) {
+    // instr() keeps % / _ literal (unlike LIKE wildcards).
+    clauses.push("instr(lower(description), lower(?)) > 0");
+    params.push(search);
+  }
+
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const sql = `
+    SELECT id, date, description, amount, type, category
+    FROM transactions
+    ${where}
+    ORDER BY date DESC, id ASC
+  `;
+
+  const rows = db.prepare(sql).all(...params) as TransactionRow[];
+  return rows.map(mapRow);
 }
 
 export async function getTransactionById(
   id: string,
 ): Promise<Transaction | undefined> {
-  const transactions = await readAllTransactions();
-  return transactions.find((transaction) => transaction.id === id);
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT id, date, description, amount, type, category
+       FROM transactions
+       WHERE id = ?`,
+    )
+    .get(id) as TransactionRow | undefined;
+
+  return row ? mapRow(row) : undefined;
 }
 
 export async function createTransaction(
   input: TransactionInput,
 ): Promise<Transaction> {
-  const transactions = await readAllTransactions();
+  const db = getDatabase();
   const created: Transaction = {
     id: randomUUID(),
     ...input,
   };
 
-  transactions.push(created);
-  await writeAllTransactions(transactions);
+  db.prepare(
+    `INSERT INTO transactions (id, date, description, amount, type, category)
+     VALUES (@id, @date, @description, @amount, @type, @category)`,
+  ).run(created);
+
   return created;
 }
 
@@ -95,31 +99,38 @@ export async function updateTransaction(
   id: string,
   input: TransactionInput,
 ): Promise<Transaction | undefined> {
-  const transactions = await readAllTransactions();
-  const index = transactions.findIndex((transaction) => transaction.id === id);
+  const db = getDatabase();
+  const result = db
+    .prepare(
+      `UPDATE transactions
+       SET date = @date,
+           description = @description,
+           amount = @amount,
+           type = @type,
+           category = @category
+       WHERE id = @id`,
+    )
+    .run({
+      id,
+      date: input.date,
+      description: input.description,
+      amount: input.amount,
+      type: input.type,
+      category: input.category,
+    });
 
-  if (index === -1) {
+  if (result.changes === 0) {
     return undefined;
   }
 
-  const updated: Transaction = {
+  return {
     id,
     ...input,
   };
-
-  transactions[index] = updated;
-  await writeAllTransactions(transactions);
-  return updated;
 }
 
 export async function deleteTransaction(id: string): Promise<boolean> {
-  const transactions = await readAllTransactions();
-  const next = transactions.filter((transaction) => transaction.id !== id);
-
-  if (next.length === transactions.length) {
-    return false;
-  }
-
-  await writeAllTransactions(next);
-  return true;
+  const db = getDatabase();
+  const result = db.prepare(`DELETE FROM transactions WHERE id = ?`).run(id);
+  return result.changes > 0;
 }
